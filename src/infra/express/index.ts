@@ -3,6 +3,9 @@ import express from "express";
 import winston from "winston";
 import { createServer, Server } from "http";
 import cors from "cors";
+import { errors } from "celebrate";
+import { httpLogger } from "@application/@shared/logger";
+import { appRoutes } from "./routes";
 
 export class ExpressServer {
   private express: express.Express;
@@ -18,6 +21,9 @@ export class ExpressServer {
 
     this.validate();
     this.config();
+    this.handlers();
+
+    this.handleParseErrors();
   }
 
   get _server(): Server {
@@ -37,6 +43,26 @@ export class ExpressServer {
       })
     );
     this.express.use(express.json());
-    this.express.use(express.urlencoded());
+    this.express.use(express.urlencoded({ extended: true }));
+    this.express.use(httpLogger.req_logger({ logger: this.logger }));
+  }
+
+  private handleParseErrors(): void {
+    this.express.use(
+      errors({
+        statusCode: 422,
+      })
+    );
+
+    this.express.use(httpLogger.err_logger({ logger: this.logger }));
+  }
+
+  private handlers(): void {
+    this.express.use(appRoutes);
+  }
+
+  public start(): void {
+    this._server.listen(this.port);
+    this.logger.info(`HTTP server running at port ${this.port}`);
   }
 }
